@@ -36,6 +36,8 @@ export const authMiddleware = (
       email: string;
     };
 
+      console.log('🔐 Decoded user from token:', { id: decoded.id, email: decoded.email }); 
+
     // Attach user to request
     req.user = {
       id: decoded.id,
