@@ -7,10 +7,36 @@ import { env } from './config/env';
 export const createApp = (): Application => {
   const app = express();
 
-  // CORS configuration
+  // CORS configuration - Allow frontend domains
+  const allowedOrigins = [
+    'http://localhost:3000',           // Local development
+    'https://ai-app-generator-frontend.vercel.app',  // Your Vercel frontend
+    /\.vercel\.app$/,                   // All Vercel preview deployments
+  ];
+
   app.use(cors({
-    origin: env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : '*',
-    credentials: true,
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      
+      // Check if origin is allowed
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (allowed instanceof RegExp) {
+          return allowed.test(origin);
+        }
+        return allowed === origin;
+      });
+      
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log('❌ CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,  // Allow cookies/auth headers
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   }));
 
   // Body parsing middleware
