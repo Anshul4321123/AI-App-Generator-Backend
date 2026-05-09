@@ -3,7 +3,8 @@ import authRoutes from '../modules/auth/auth.routes';
 import { RecordsController } from '../modules/records/records.controller';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { query } from '../config/db';
-
+import importRoutes from './import.routes';
+import notificationsRoutes from './notifications.routes';
 const router = Router();
 const recordsController = new RecordsController();
 
@@ -118,6 +119,8 @@ router.delete('/api/apps/:id', authMiddleware, async (req: AuthRequest, res: Res
   }
 });
 
+router.use(importRoutes);
+router.use(notificationsRoutes);
 // ============================================
 // DYNAMIC CRUD ROUTES (MUST come LAST!)
 // ============================================

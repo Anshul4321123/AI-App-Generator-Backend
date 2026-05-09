@@ -7,12 +7,28 @@ export interface DataRecord {
   id: string;
   app_id: string | null;
   entity_name: string;
-  data: any; // Changed from Record<string, any> to any
+  data: any;
   user_id: string;
   created_at: Date;
 }
 
 export class RecordsService {
+  /**
+   * Helper: Create notification for user
+   */
+  private async createNotification(userId: string, message: string, type: string = 'info') {
+    try {
+      await query(
+        `INSERT INTO notifications (user_id, message, type, read) 
+         VALUES ($1, $2, $3, $4)`,
+        [userId, message, type, false]
+      );
+    } catch (error) {
+      console.error('Failed to create notification:', error);
+      // Don't throw - notifications are non-critical
+    }
+  }
+
   /**
    * Create a new record
    */
@@ -39,6 +55,9 @@ export class RecordsService {
       [entityName, sanitizedData, userId, appId || null]
     );
 
+    // Create notification
+    await this.createNotification(userId, `Created new ${entityName} record`, 'success');
+
     return result.rows[0];
   }
 
@@ -59,14 +78,11 @@ export class RecordsService {
 
     // Add additional filters if provided (basic implementation)
     if (filters && Object.keys(filters).length > 0) {
-      // Simple filter: check if data contains specific fields
-      // This is a basic implementation - can be enhanced later
       let filterIndex = 3;
       for (const [key, value] of Object.entries(filters)) {
         queryText += ` AND data->>$3 = $${filterIndex}`;
         queryParams.push(key, value);
         filterIndex++;
-        // Note: This simplified version needs improvement for production
         break; // Only apply first filter for now
       }
     }
@@ -132,6 +148,9 @@ export class RecordsService {
       [mergedData, id, entityName, userId]
     );
 
+    // Create notification
+    await this.createNotification(userId, `Updated ${entityName} record`, 'info');
+
     return result.rows[0];
   }
 
@@ -152,6 +171,9 @@ export class RecordsService {
        WHERE id = $1 AND entity_name = $2 AND user_id = $3`,
       [id, entityName, userId]
     );
+
+    // Create notification
+    await this.createNotification(userId, `Deleted ${entityName} record`, 'warning');
   }
 
   /**
