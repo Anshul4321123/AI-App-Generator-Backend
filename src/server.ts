@@ -3,7 +3,11 @@ import { env } from './config/env';
 import { pool } from './config/db';
 
 const app = createApp();
-const PORT = env.PORT;
+
+// ✅ CRITICAL: Use PORT from environment (Render sets this to 10000 by default)
+// ✅ CRITICAL: Bind to 0.0.0.0 to accept external requests
+const PORT = process.env.PORT || 5000;
+const HOST = '0.0.0.0';
 
 // Graceful shutdown function
 const gracefulShutdown = async (signal: string) => {
@@ -25,14 +29,14 @@ const gracefulShutdown = async (signal: string) => {
   }
 };
 
-// Start server
-const server = app.listen(PORT, () => {
+// ✅ Start server on 0.0.0.0:$PORT
+const server = app.listen(Number(PORT), HOST, () => {
   console.log(`
 ╔══════════════════════════════════════════════════════╗
 ║                                                      ║
 ║   🎉 BACKEND SKELETON IS RUNNING!                    ║
 ║                                                      ║
-║   📡 Server: http://localhost:${PORT}                  ║
+║   📡 Server: http://${HOST}:${PORT}                    ║
 ║   🌍 Environment: ${env.NODE_ENV.padEnd(20)}              ║
 ║                                                      ║
 ║   📌 Available endpoints:                            ║
