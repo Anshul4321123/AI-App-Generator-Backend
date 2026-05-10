@@ -15,12 +15,31 @@ router.post('/login', authController.login.bind(authController));
 // Protected routes (require authentication)
 router.get('/me', authMiddleware, authController.me.bind(authController));
 
-// Get all users (for assignment dropdown) - Available to authenticated users
+// ✅ Get users from same domain for assignment dropdown
 router.get('/users/list', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const result = await query(
-      'SELECT id, email, role FROM users ORDER BY email ASC'
-    );
+    const currentUserEmail = req.user?.email;
+    const currentUserRole = req.user?.role;
+    
+    if (!currentUserEmail) {
+      return res.status(401).json({ success: false, error: 'User not found' });
+    }
+    
+    // Extract domain from current user's email
+    const domain = currentUserEmail.split('@')[1];
+    
+    let queryText = 'SELECT id, email, role FROM users';
+    let params: any[] = [];
+    
+    // Admin sees all users, others see only same domain
+    if (currentUserRole === 'admin') {
+      queryText += ' ORDER BY email ASC';
+    } else {
+      queryText += ' WHERE email LIKE $1 ORDER BY email ASC';
+      params.push(`%@${domain}`);
+    }
+    
+    const result = await query(queryText, params);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     next(error);
@@ -67,7 +86,7 @@ router.put(
   }
 );
 
-// Admin only: Get all users (full list)
+// Admin only: Get all users (full list - no domain filter)
 router.get(
   '/users',
   authMiddleware,
