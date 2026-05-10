@@ -6,6 +6,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
+    role: string;
   };
 }
 
@@ -30,18 +31,20 @@ export const authMiddleware = (
       return res.status(401).json({ error: 'Token missing' });
     }
 
-    // Verify token
+    // Verify token - include role in decoded type
     const decoded = jwt.verify(token, env.JWT_SECRET) as {
       id: string;
       email: string;
+      role: string;
     };
 
-      console.log('🔐 Decoded user from token:', { id: decoded.id, email: decoded.email }); 
+    // console.log('🔐 Decoded user from token:', { id: decoded.id, email: decoded.email, role: decoded.role });
 
-    // Attach user to request
+    // Attach user to request with role
     req.user = {
       id: decoded.id,
       email: decoded.email,
+      role: decoded.role || 'member', // Fallback to 'member' if role not in token
     };
 
     next();
@@ -72,10 +75,12 @@ export const optionalAuthMiddleware = (
       const decoded = jwt.verify(token, env.JWT_SECRET) as {
         id: string;
         email: string;
+        role: string;
       };
       req.user = {
         id: decoded.id,
         email: decoded.email,
+        role: decoded.role || 'member',
       };
     }
     

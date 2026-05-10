@@ -30,7 +30,7 @@ export const createApp = (): Application => {
       if (isAllowed) {
         callback(null, true);
       } else {
-        console.log('❌ CORS blocked origin:', origin);
+        // console.log('❌ CORS blocked origin:', origin);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -46,7 +46,7 @@ export const createApp = (): Application => {
   // Request logging (development only)
   if (env.NODE_ENV === 'development') {
     app.use((req, res, next) => {
-      console.log(`📨 ${req.method} ${req.path}`);
+      // console.log(`📨 ${req.method} ${req.path}`);
       next();
     });
   }

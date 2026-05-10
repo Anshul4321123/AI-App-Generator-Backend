@@ -25,7 +25,7 @@ export async function query(text: string, params?: any[]) {
   const duration = Date.now() - start;
 
   if (env.NODE_ENV === 'development') {
-    console.log('📊 Query:', { text, duration, rows: result.rowCount });
+    // console.log('📊 Query:', { text, duration, rows: result.rowCount });
   }
 
   return result;
@@ -33,6 +33,6 @@ export async function query(text: string, params?: any[]) {
 
 process.on('SIGINT', async () => {
   await pool.end();
-  console.log('🔌 Database pool closed');
+  // console.log('🔌 Database pool closed');
   process.exit(0);
 });

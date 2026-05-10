@@ -49,7 +49,7 @@ export const errorMiddleware = (
   if (statusCode === 500) {
     console.error('❌ Server Error:', err);
   } else if (env.NODE_ENV === 'development') {
-    console.log('⚠️ Client Error:', { statusCode, message });
+    // console.log('⚠️ Client Error:', { statusCode, message });
   }
 
   // Send response

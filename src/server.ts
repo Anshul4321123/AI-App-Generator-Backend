@@ -11,20 +11,20 @@ const HOST = '0.0.0.0';
 
 // Graceful shutdown function
 const gracefulShutdown = async (signal: string) => {
-  console.log(`\n⚠️ Received ${signal}, starting graceful shutdown...`);
+  // console.log(`\n⚠️ Received ${signal}, starting graceful shutdown...`);
   
   try {
     // Close database connections
     await pool.end();
-    console.log('✅ Database connections closed');
+    // console.log('✅ Database connections closed');
     
     // Close server
     server.close(() => {
-      console.log('✅ HTTP server closed');
+      // console.log('✅ HTTP server closed');
       process.exit(0);
     });
   } catch (error) {
-    console.error('❌ Error during shutdown:', error);
+    // console.error('❌ Error during shutdown:', error);
     process.exit(1);
   }
 };

@@ -20,6 +20,7 @@ export interface AuthResponse {
   user: {
     id: string;
     email: string;
+    role: string;
   };
 }
 
@@ -48,27 +49,44 @@ export class AuthService {
       throw new AppError('User already exists with this email', 409);
     }
 
+    // ✅ Extract domain from email
+    const emailDomain = input.email.toLowerCase().split('@')[1];
+    
+    // ✅ Check if ANY user with this domain already exists
+    const domainCheckResult = await query(
+      "SELECT COUNT(*) as count FROM users WHERE email LIKE $1",
+      [`%@${emailDomain}`]
+    );
+    const domainUserCount = parseInt(domainCheckResult.rows[0].count, 10);
+    
+    // ✅ First user from a new domain becomes ADMIN
+    // Subsequent users from same domain become MEMBER
+    const userRole = domainUserCount === 0 ? 'admin' : 'member';
+    
+    // console.log(`📝 Registering new user: ${input.email}, Domain: ${emailDomain}, Role: ${userRole} (Existing users from this domain: ${domainUserCount})`);
+
     // Hash password
     const hashedPassword = await bcrypt.hash(input.password, this.SALT_ROUNDS);
 
-    // Insert user
+    // Insert user with role
     const result = await query(
-      `INSERT INTO users (email, password_hash) 
-       VALUES ($1, $2) 
-       RETURNING id, email, created_at`,
-      [input.email.toLowerCase(), hashedPassword]
+      `INSERT INTO users (email, password_hash, role) 
+      VALUES ($1, $2, $3) 
+      RETURNING id, email, role, created_at`,
+      [input.email.toLowerCase(), hashedPassword, userRole]
     );
 
     const user = result.rows[0];
 
-    // Generate JWT token
-    const token = this.generateToken(user.id, user.email);
+    // Generate JWT token with role
+    const token = this.generateToken(user.id, user.email, user.role);
 
     return {
       token,
       user: {
         id: user.id,
         email: user.email,
+        role: user.role,
       },
     };
   }
@@ -84,9 +102,9 @@ export class AuthService {
       throw new AppError('Password is required', 400);
     }
 
-    // Find user
+    // Find user with role
     const result = await query(
-      'SELECT id, email, password_hash FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, role FROM users WHERE email = $1',
       [input.email.toLowerCase()]
     );
 
@@ -102,23 +120,49 @@ export class AuthService {
       throw new AppError('Invalid email or password', 401);
     }
 
-    // Generate JWT token
-    const token = this.generateToken(user.id, user.email);
+    // Generate JWT token with role
+    const token = this.generateToken(user.id, user.email, user.role);
 
     return {
       token,
       user: {
         id: user.id,
         email: user.email,
+        role: user.role,
       },
     };
   }
 
-  private generateToken(userId: string, email: string): string {
+  // Generate token with role included
+  private generateToken(userId: string, email: string, role: string): string {
     return jwt.sign(
-      { id: userId, email: email },
+      { id: userId, email: email, role: role },
       env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+  }
+
+  // Update user role (admin only)
+  async updateUserRole(userId: string, newRole: string, currentUserRole: string): Promise<void> {
+    // Only admin can change roles
+    if (currentUserRole !== 'admin') {
+      throw new AppError('Only admins can change user roles', 403);
+    }
+    
+    const validRoles = ['admin', 'team_lead', 'member'];
+    if (!validRoles.includes(newRole)) {
+      throw new AppError(`Invalid role. Must be one of: ${validRoles.join(', ')}`, 400);
+    }
+    
+    const result = await query(
+      'UPDATE users SET role = $1 WHERE id = $2 RETURNING id',
+      [newRole, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      throw new AppError('User not found', 404);
+    }
+    
+    // console.log(`✅ User ${userId} role updated to ${newRole}`);
   }
 }

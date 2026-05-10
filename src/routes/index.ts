@@ -5,6 +5,8 @@ import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { query } from '../config/db';
 import importRoutes from './import.routes';
 import notificationsRoutes from './notifications.routes';
+import teamsRoutes from './teams.routes';
+import projectsRoutes from './projects.routes';
 const router = Router();
 const recordsController = new RecordsController();
 
@@ -27,14 +29,14 @@ router.get('/health', (req: Request, res: Response) => {
 // GET /api/apps - Get all apps for current user
 router.get('/api/apps', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    console.log('📡 [APPS] Fetching apps for user:', req.user?.id);
+    // console.log('📡 [APPS] Fetching apps for user:', req.user?.id);
     
     const result = await query(
       'SELECT id, name, config, created_by, created_at FROM apps WHERE created_by = $1 ORDER BY created_at DESC',
       [req.user?.id]
     );
     
-    console.log('✅ [APPS] Found:', result.rows.length);
+    // console.log('✅ [APPS] Found:', result.rows.length);
     
     res.json({ success: true, data: result.rows });
   } catch (error) {
@@ -119,8 +121,23 @@ router.delete('/api/apps/:id', authMiddleware, async (req: AuthRequest, res: Res
   }
 });
 
+// Check if app name exists for user (before creating)
+router.post('/api/apps/check-name', authMiddleware, async (req: AuthRequest, res: Response) => {
+  const { name } = req.body;
+  const userId = req.user?.id;
+  
+  const result = await query(
+    'SELECT id FROM apps WHERE name = $1 AND created_by = $2',
+    [name, userId]
+  );
+  
+  res.json({ exists: result.rows.length > 0 });
+});
+
 router.use(importRoutes);
 router.use(notificationsRoutes);
+router.use(teamsRoutes);
+router.use(projectsRoutes);
 // ============================================
 // DYNAMIC CRUD ROUTES (MUST come LAST!)
 // ============================================

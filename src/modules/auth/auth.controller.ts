@@ -48,9 +48,9 @@ export class AuthController {
 
   async me(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      // Use AuthRequest type which has user property
       const userId = req.user?.id;
       const userEmail = req.user?.email;
+      const userRole = req.user?.role;
 
       if (!userId) {
         throw new AppError('Not authenticated', 401);
@@ -61,6 +61,7 @@ export class AuthController {
         data: {
           id: userId,
           email: userEmail,
+          role: userRole,
         },
       });
     } catch (error) {
