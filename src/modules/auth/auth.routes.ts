@@ -15,69 +15,93 @@ router.post('/login', authController.login.bind(authController));
 // Protected routes (require authentication)
 router.get('/me', authMiddleware, authController.me.bind(authController));
 
-// ✅ Get users from same domain for assignment dropdown
+// ✅ Get users from SAME DOMAIN only (for all users including admins)
 router.get('/users/list', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const currentUserEmail = req.user?.email;
-    const currentUserRole = req.user?.role;
     
     if (!currentUserEmail) {
       return res.status(401).json({ success: false, error: 'User not found' });
     }
     
-    // Extract domain from current user's email
     const domain = currentUserEmail.split('@')[1];
     
-    let queryText = 'SELECT id, email, role FROM users';
-    let params: any[] = [];
+    // ✅ ALL users (including admins) only see users from their domain
+    const result = await query(
+      'SELECT id, email, role FROM users WHERE email LIKE $1 ORDER BY email ASC',
+      [`%@${domain}`]
+    );
     
-    // Admin sees all users, others see only same domain
-    if (currentUserRole === 'admin') {
-      queryText += ' ORDER BY email ASC';
-    } else {
-      queryText += ' WHERE email LIKE $1 ORDER BY email ASC';
-      params.push(`%@${domain}`);
-    }
+    // console.log(`🔍 /users/list - User: ${currentUserEmail}, Domain: ${domain}, Found: ${result.rows.length} users`);
     
-    const result = await query(queryText, params);
     res.json({ success: true, data: result.rows });
   } catch (error) {
     next(error);
   }
 });
 
-// Admin only: Update user role
+// ✅ Update user role with DOMAIN CHECK
 router.put(
   '/users/:userId/role',
   authMiddleware,
-  requireAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       const { userId } = req.params;
       const { role } = req.body;
-      const currentUserRole = req.user?.role || 'member';
-
+      const currentUser = req.user;
+      
+      if (!currentUser) {
+        return res.status(401).json({ success: false, error: 'Not authenticated' });
+      }
+      
+      // Check if current user is admin
+      if (currentUser.role !== 'admin') {
+        return res.status(403).json({ success: false, error: 'Only admins can change user roles' });
+      }
+      
       const validRoles = ['admin', 'team_lead', 'member'];
       if (!validRoles.includes(role)) {
-        throw new AppError(`Invalid role. Must be one of: ${validRoles.join(', ')}`, 400);
+        return res.status(400).json({ success: false, error: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
       }
-
-      if (currentUserRole !== 'admin') {
-        throw new AppError('Only admins can change user roles', 403);
+      
+      // Get target user's email
+      const targetUserResult = await query(
+        'SELECT id, email, role FROM users WHERE id = $1',
+        [userId]
+      );
+      
+      if (targetUserResult.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'User not found' });
       }
-
+      
+      const targetUser = targetUserResult.rows[0];
+      const currentUserDomain = currentUser.email.split('@')[1];
+      const targetUserDomain = targetUser.email.split('@')[1];
+      
+      // ✅ DOMAIN CHECK: Can only change roles of users with SAME domain
+      if (currentUserDomain !== targetUserDomain) {
+        return res.status(403).json({ 
+          success: false, 
+          error: `Cannot change role of users from different domain. You can only manage users from ${currentUserDomain}` 
+        });
+      }
+      
+      // Cannot change your own role
+      if (currentUser.id === userId) {
+        return res.status(403).json({ success: false, error: 'Cannot change your own role' });
+      }
+      
+      // Update role
       const result = await query(
         'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, email, role',
         [role, userId]
       );
-
-      if (result.rows.length === 0) {
-        throw new AppError('User not found', 404);
-      }
-
+      
+      // console.log(`✅ User ${targetUser.email} role updated to ${role} by ${currentUser.email}`);
+      
       res.json({
         success: true,
-        message: 'User role updated successfully',
+        message: `User role updated to ${role}`,
         data: result.rows[0]
       });
     } catch (error) {
@@ -86,16 +110,28 @@ router.put(
   }
 );
 
-// Admin only: Get all users (full list - no domain filter)
+// ✅ Team Management Page - Only show users from same domain
 router.get(
-  '/users',
+  '/users/team',
   authMiddleware,
-  requireAdmin,
   async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
+      const currentUser = req.user;
+      
+      if (!currentUser) {
+        return res.status(401).json({ success: false, error: 'Not authenticated' });
+      }
+      
+      const currentUserDomain = currentUser.email.split('@')[1];
+      
+      // Only show users from same domain
       const result = await query(
-        'SELECT id, email, role, created_at FROM users ORDER BY created_at DESC'
+        'SELECT id, email, role, created_at FROM users WHERE email LIKE $1 ORDER BY created_at DESC',
+        [`%@${currentUserDomain}`]
       );
+      
+      // console.log(`👥 /users/team - User: ${currentUser.email}, Domain: ${currentUserDomain}, Found: ${result.rows.length} users`);
+      
       res.json({ success: true, data: result.rows });
     } catch (error) {
       next(error);
